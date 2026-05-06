@@ -57,7 +57,7 @@ void error_message(const char *message, int16_t state)
 void setup()
 {
   Serial.begin(115200);
-
+  delay(2000);
   /* Initialize Lora */
   // Set up SPI with our specific pins
   spi.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_NSS_PIN);
