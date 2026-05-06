@@ -2,6 +2,7 @@
 #include <RadioLib.h>
 #include <SPI.h>
 #include <esp_mac.h>
+#include <map>
 
 // function definitions:
 
@@ -36,6 +37,19 @@ SX1262 radio = new Module(LORA_NSS_PIN, LORA_DIO1_PIN, LORA_RST_PIN, LORA_BUSY_P
 
 /*~~~~~Global Variables~~~~~*/
 volatile bool receivedFlag = false;
+
+/*~~~~~Timing State~~~~~*/
+// The first ID we ever see becomes the lap marker (start/finish line).
+// Subsequent sightings of that same ID close out a lap.
+// Other IDs are treated as segments within the current lap.
+bool     lap_marker_set = false;
+uint32_t lap_marker_id  = 0;
+uint32_t lap_count      = 0;
+uint32_t lap_start_ms   = 0;
+
+// Per-lap segment timestamps: id -> millis() when seen this lap.
+// Cleared on every lap rollover.
+std::map<uint32_t, uint32_t> segment_times;
 
 /*~~~~~Interrupts~~~~~*/
 void IRAM_ATTR receiveISR(void)
@@ -117,25 +131,62 @@ void loop()
     uint8_t data[3];
     int state = radio.readData(data, sizeof(data));
 
-    // parse data as id
-    uint32_t id =
-        ((uint32_t)data[0] << 16) |
-        ((uint32_t)data[1] << 8) |
-        data[2];
-
     if (state == RADIOLIB_ERR_NONE)
     {
+      // parse data as id
+      uint32_t id =
+          ((uint32_t)data[0] << 16) |
+          ((uint32_t)data[1] << 8) |
+          data[2];
+
       // packet was successfully received
       Serial.println("Received packet!");
 
       // print the data of the packet which is ID
-      Serial.printf("Device:  %06x\n", id);
+      Serial.printf("Device:  %06X\n", id);
 
       // print the RSSI (Received Signal Strength Indicator)
       // of the last received packet
       Serial.print("\tRSSI:\t\t");
       Serial.print(radio.getRSSI());
       Serial.println(" dBm");
+
+      /* Lap and Segment Timing */
+      uint32_t now = millis(); // get current time to compare
+
+      if (!lap_marker_set)
+      {
+        // First ID we've ever seen, set it as the lap marker.
+        lap_marker_set = true;
+        lap_marker_id  = id;
+        lap_start_ms   = now;
+        Serial.printf("\tLap marker registered: %06X - Timing Started\n", id);
+      }
+      else if (id == lap_marker_id)
+      {
+        uint32_t elapsed = now - lap_start_ms;  
+        lap_count++;
+        Serial.printf("\tLAP %lu complete: %lu ms (%.2f s)\n",
+                      lap_count, elapsed, elapsed / 1000.0f);
+
+        // Dump segment splits for this lap, then clear for the next one.
+        for (auto &kv : segment_times)
+        {
+          uint32_t split = kv.second - lap_start_ms;
+          Serial.printf("\t  segment %06X: %lu ms\n", kv.first, split);
+        }
+        segment_times.clear();
+
+        lap_start_ms = now;
+      }
+      else
+      {
+        // Segment beacon within the current lap.
+        uint32_t split = now - lap_start_ms;
+        segment_times[id] = now;
+        Serial.printf("\tSegment %06X @ %lu ms into lap %lu\n",
+                      id, split, lap_count + 1);
+      }
     }
     else if (state == RADIOLIB_ERR_RX_TIMEOUT)
     {
