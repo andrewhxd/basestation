@@ -67,6 +67,7 @@ bool     lap_marker_set = false;
 uint32_t lap_marker_id  = 0;
 uint32_t lap_count      = 0;
 uint32_t lap_start_ms   = 0;
+uint32_t last_lap_ms    = 0;   // duration of the most recently completed lap
 
 // Per-lap segment timestamps: id -> millis() when seen this lap.
 // Cleared on every lap rollover.
@@ -219,7 +220,8 @@ void loop()
       }
       else if (id == lap_marker_id)
       {
-        uint32_t elapsed = now - lap_start_ms;  
+        uint32_t elapsed = now - lap_start_ms;
+        last_lap_ms = elapsed;
         lap_count++;
         Serial.printf("\tLAP %lu complete: %lu ms (%.2f s)\n",
                       lap_count, elapsed, elapsed / 1000.0f);
@@ -266,6 +268,29 @@ void loop()
     {
       error_message("Resuming reception failed", state);
     }
+  }
+
+  /* Live display update: previous lap + current elapsed */
+  static uint32_t last_draw_ms = 0;
+  uint32_t now = millis();
+  if (now - last_draw_ms >= 100)  // ~10 Hz refresh
+  {
+    last_draw_ms = now;
+
+    display.clearBuffer();
+
+    // Top: most recently completed lap time in seconds (converted from ms)
+    snprintf(display_str, sizeof(display_str),
+             "Last: %.2fs", last_lap_ms / 1000.0f);
+    draw_centered(30, display_str);
+
+    // Bottom: live elapsed time on current lap
+    uint32_t elapsed = lap_marker_set ? (now - lap_start_ms) : 0;
+    snprintf(display_str, sizeof(display_str),
+             "Now:  %.2fs", elapsed / 1000.0f);
+    draw_centered(60, display_str);
+
+    display.sendBuffer();
   }
 }
 
