@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include <esp_mac.h>
 #include <map>
+#include <U8g2lib.h>
 
 // function definitions:
 
@@ -34,6 +35,26 @@ SX1262 radio = new Module(LORA_NSS_PIN, LORA_DIO1_PIN, LORA_RST_PIN, LORA_BUSY_P
 #define LORA_FREQ 915.0
 #define LORA_BW 125.0
 #define LORA_SF 9
+
+/*~~~~~Screen Configuration~~~~~*/
+
+#define OLED_RESET 21
+#define OLED_SDA 17
+#define OLED_SCL 18
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C display(U8G2_R0, /* clock=*/OLED_SCL, /* data=*/OLED_SDA, /* reset=*/OLED_RESET); // All Boards without Reset of the Display
+
+// Screen drawing locations
+#define X_MAX 128
+#define Y_MAX 64
+static uint8_t iteration_count = 0;
+static uint32_t x_coor = 0;
+static uint32_t y_coor = 10;
+static int8_t x_rate = 4;
+static int8_t y_rate = 4;
+
+// String to draw on screen
+static char display_str[80] = {0};
+
 
 /*~~~~~Global Variables~~~~~*/
 volatile bool receivedFlag = false;
@@ -68,10 +89,34 @@ void error_message(const char *message, int16_t state)
     ; // loop forever
 }
 
+// Draw text horizontally centered on the screen at the given baseline y.
+// Uses whatever font is currently set on `display`.
+void draw_centered(int16_t y, const char *text)
+{
+  int16_t w = display.getStrWidth(text);
+  int16_t x = (X_MAX - w) / 2;
+  if (x < 0)
+    x = 0; // string wider than screen — pin to left
+  display.drawStr(x, y, text);
+}
+
+void logo()
+{
+  snprintf(display_str, sizeof(display_str), "Initializing");
+  display.clearBuffer();
+  draw_centered(20, display_str);
+
+  snprintf(display_str, sizeof(display_str), "Basestation");
+  draw_centered(40, display_str);
+
+  display.sendBuffer();
+}
+
 void setup()
 {
   Serial.begin(115200);
   delay(2000);
+
   /* Initialize Lora */
   // Set up SPI with our specific pins
   spi.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_NSS_PIN);
@@ -118,6 +163,16 @@ void setup()
     error_message("Starting reception failed", state);
   }
   Serial.println("Complete!");
+
+  // Initialize the display
+  display.begin();
+  display.setContrast(200);
+  display.setFont(u8g2_font_ncenB10_tr);
+
+  // draw startup logo
+  logo();
+  delay(3000);
+  display.clear();
 }
 
 void loop()
