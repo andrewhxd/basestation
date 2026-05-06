@@ -282,7 +282,7 @@ void loop()
     // Top: most recently completed lap time in seconds (converted from ms)
     snprintf(display_str, sizeof(display_str),
              "Last: %.2fs", last_lap_ms / 1000.0f);
-    draw_centered(20, display_str);
+    draw_centered(25, display_str);
 
     // Bottom: live elapsed time on current lap
     uint32_t elapsed = lap_marker_set ? (now - lap_start_ms) : 0;
