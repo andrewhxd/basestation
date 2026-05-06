@@ -113,25 +113,23 @@ void loop()
   {
     receivedFlag = false;
 
-    // you can receive data as an Arduino String
-    String packet_data;
-    int state = radio.readData(packet_data);
+    // data buffer
+    uint8_t data[3];
+    int state = radio.readData(data, sizeof(data));
+
+    // parse data as id
+    uint32_t id =
+        ((uint32_t)data[0] << 16) |
+        ((uint32_t)data[1] << 8) |
+        data[2];
 
     if (state == RADIOLIB_ERR_NONE)
     {
       // packet was successfully received
       Serial.println("Received packet!");
 
-      // print the data of the packet
-      Serial.print("[SX1262] Data:  ");
-      Serial.println(packet_data);
-      Serial.print("\t[");
-      const char *data = packet_data.c_str();
-      for (int i = 0; i < packet_data.length(); i++)
-      {
-        Serial.printf("%02X ", data[i]);
-      }
-      Serial.println("]");
+      // print the data of the packet which is ID
+      Serial.printf("Device:  %06x\n", id);
 
       // print the RSSI (Received Signal Strength Indicator)
       // of the last received packet
