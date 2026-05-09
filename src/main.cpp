@@ -23,6 +23,9 @@
 #define LORA_BUSY_PIN 13
 #define LORA_DIO1_PIN 14
 
+// GC1109 front-end enable (CSD)
+#define FEM_EN 2
+
 /*~~~~~Radio Configuration~~~~~*/
 
 // Initialize SX1262 radio
@@ -119,11 +122,15 @@ void setup()
   delay(2000);
 
   /* Initialize Lora */
+
+  pinMode(FEM_EN, OUTPUT);
+  digitalWrite(FEM_EN, HIGH); // GC1109 Permanently Enabled
+
   // Set up SPI with our specific pins
   spi.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_NSS_PIN);
 
   Serial.print("Initializing radio...");
-  int16_t state = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, 5, 0x12, 15, 8);
+  int16_t state = radio.begin(LORA_FREQ, LORA_BW, LORA_SF, 5, 0x12, 22, 8);
   if (state != RADIOLIB_ERR_NONE)
   {
     error_message("Radio initialization failed", state);
